@@ -3,3 +3,4 @@
 /__pycache__/*
 /savedModels/*
 !/savedModels/placeholder.txt
+!/data/placeholder.txt
