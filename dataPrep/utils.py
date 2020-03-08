@@ -33,6 +33,7 @@ def processData(df, sol_wind_type = "ecmwf"):
     # convert cat to numbers 
     df['season'] = label_encoder.fit_transform(df['season']) 
     df['country'] = label_encoder.fit_transform(df['country'])
+    df['node'] = df['node'].astype(int)
     
     # normalize all data except the node ids and time
     non_normalized_cols = ["node", "time", "solar_ecmwf", "wind_ecmwf", "holiday"]
@@ -47,7 +48,7 @@ def processData(df, sol_wind_type = "ecmwf"):
 
 
 # split our sequences to incorporate historical data and the predicted values 
-def split_sequences(df, start_idx , historical = 72, forecast = 24):
+def split_sequences(df, start_idx,  historical = 72, forecast = 24):
 
     # extract all 0 and 12 hour indices
     df = df.drop(columns = "time")
@@ -55,9 +56,13 @@ def split_sequences(df, start_idx , historical = 72, forecast = 24):
     
     X_sequences = []
     target = []
+    """
+    This is extremely inefficient right now, but prioritizing interpretability and easiness to code right now
+    Will probably need to update once we have settle on our final format
+    """
     for i, idx in enumerate(start_idx):
         X = df.iloc[idx : idx+historical,:]
-        y = df.loc[idx+historical : idx+historical+forecast, ["load", "node"]]
+        y = df.loc[idx+historical+1 : idx+historical+forecast, ["load", "node"]]
         
         X_nodes = list(X.node.unique())
         y_nodes = list(y.node.unique())
@@ -72,7 +77,10 @@ def split_sequences(df, start_idx , historical = 72, forecast = 24):
         X_sequences.append(np.array(X.drop(columns = "node")).astype(float).tolist())
         target.append(y.load.tolist())
         
-      
+    #return np.array(X_sequences), \
+    #        np.array(target)
+   
+        
     return torch.from_numpy(np.array(X_sequences)), \
             torch.from_numpy(np.array(target))
    
@@ -91,9 +99,7 @@ class energyDataset(Dataset):
         
         self.historical_len = historical_len
         self.forecast_len = forecast_len
-        self.inputs, self.target = split_sequences(df, self.start_idx, 
-                                                   historical = historical_len,
-                                                   forecast = forecast_len)
+        self.inputs, self.target = self.formatGNNInput(df)
         print("Generated Sequences")
         
     def __len__(self):
@@ -101,12 +107,38 @@ class energyDataset(Dataset):
     
     def __getitem__(self, index):
         return self.inputs[index], self.target[index]
-        
     
+    
+    def formatGNNInput(self, df):
+        """
+        splits our dataframe into separate nodes and then splits the sequences for each
+        Converts 3d input (num_obs, time, variables) for each node into a 3d input (num_obs, node, time, variables)
+        Final input into model is 4d (batch size, node, time, variables)
+        """
+
+        # split our processed dataframes
+        split_dfs = [x for _, x in df.groupby('node')]
+        
+        inputs, targets = [],[]
+        for d in split_dfs:
+            d = d.reset_index()
+            start_idx =  d.index[d['hour'].isin([0,12])].tolist()
+            inputs_tmp, target_tmp = split_sequences(d, start_idx,
+                                                     historical = self.historical_len,
+                                                     forecast = self.forecast_len)       
+            inputs.append(inputs_tmp)
+            targets.append(target_tmp)
+            
+        return torch.stack(inputs).transpose(0,1), \
+                torch.stack(targets).transpose(0,1)
+
+
+
 """
 processed_dir = "./data/processed/"
 
 df = pd.read_parquet(processed_dir + "Energy Demand Data (Partial).parquet")
+df = df[df['node'].astype(int) < 4] # for testing
 df.head()
 
 processed = processData(df)
@@ -118,5 +150,4 @@ for x, y in dataloader:
     print(x.shape)
     print(y.shape)
     break
-
 """
