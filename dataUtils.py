@@ -17,12 +17,36 @@ import pandas as pd
 import numpy as np
 import torch
 from sklearn import preprocessing
+from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset, DataLoader
 
+# Load feature data and graph data
+def loadEnergyData(processed_dir, incl_nodes = "All", partial = False):
+    # load features
+    if partial:
+        energy_demand = pd.read_parquet(processed_dir + "Energy Demand Data (Partial).parquet")
+    else:
+        energy_demand = pd.read_parquet(processed_dir + "Energy Demand Data.parquet")
+        
+    # load adjacency matrix
+    adj_mat = np.load(processed_dir + "adjacency_matrix.npy")
+    
+    # subset for testing
+    if incl_nodes != "All":
+        assert type(incl_nodes) == int and incl_nodes <= 1514
+        energy_demand = energy_demand.loc[energy_demand['node'].astype(int) <= incl_nodes] 
+        num_nodes = len(energy_demand.node.unique())
+        adj_mat = adj_mat[:num_nodes, :num_nodes]
+        
+    # I may need to do some normalization for the adjacency matrix here
+        
+    return energy_demand, adj_mat
+    
 
 # very basic preprocessing
 def processData(df, sol_wind_type = "ecmwf"):
     label_encoder = preprocessing.LabelEncoder() 
+    scaler = MinMaxScaler()
     
     assert sol_wind_type in ['cosmo', 'ecmwf']
     if sol_wind_type == 'cosmo':
@@ -39,16 +63,17 @@ def processData(df, sol_wind_type = "ecmwf"):
     non_normalized_cols = ["node", "time", "solar_ecmwf", "wind_ecmwf", "holiday"]
     node_time = df[non_normalized_cols]
     df = df.drop(columns = non_normalized_cols)
-    df_normalized = pd.DataFrame(preprocessing.normalize(df), columns = df.columns)
     
-    df = pd.concat([node_time, df_normalized], axis = 1)
-    return df
-
+    #df_normalized = pd.DataFrame(preprocessing.normalize(df), columns = df.columns)
+    df_normalized = pd.DataFrame(scaler.fit_transform(df), columns = df.columns)
+    
+    df_out = pd.concat([node_time, df_normalized], axis = 1)
+    return df_out
 
 
 
 # split our sequences to incorporate historical data and the predicted values 
-def split_sequences(df, start_idx,  historical = 72, forecast = 24):
+def splitSequences(df, start_idx, subset_x = None, historical = 72, forecast = 24):
 
     # extract all 0 and 12 hour indices
     df = df.drop(columns = "time")
@@ -62,10 +87,15 @@ def split_sequences(df, start_idx,  historical = 72, forecast = 24):
     """
     for i, idx in enumerate(start_idx):
         X = df.iloc[idx : idx+historical,:]
+        
         y = df.loc[idx+historical+1 : idx+historical+forecast, ["load", "node"]]
         
         X_nodes = list(X.node.unique())
         y_nodes = list(y.node.unique())
+        
+        # only include a subset of featurres
+        if subset_x is not None:
+            X = X.loc[:, subset_x]
 
         if len(X_nodes) > 1 or y_nodes != X_nodes:
             continue
@@ -77,9 +107,6 @@ def split_sequences(df, start_idx,  historical = 72, forecast = 24):
         X_sequences.append(np.array(X.drop(columns = "node")).astype(float).tolist())
         target.append(y.load.tolist())
         
-    #return np.array(X_sequences), \
-    #        np.array(target)
-   
         
     return torch.from_numpy(np.array(X_sequences)), \
             torch.from_numpy(np.array(target))
@@ -87,10 +114,10 @@ def split_sequences(df, start_idx,  historical = 72, forecast = 24):
 
 # core dataset class - only set up for LSTM now
 class energyDataset(Dataset):
-    def __init__(self, df, start_values = [0, 12], historical_len = 72,
-                  forecast_len = 24, processing_function = None):
+    def __init__(self, df, start_values = [0, 12], subset_x = None, 
+                 historical_len = 72, forecast_len = 24, 
+                 processing_function = None):
         
-        self.start_idx =  df.index[df['hour'].isin([0,12])].tolist()
         
         # TODO: allowing passing of parameters to processign funtion if necessary
         if processing_function is not None:
@@ -99,7 +126,13 @@ class energyDataset(Dataset):
         
         self.historical_len = historical_len
         self.forecast_len = forecast_len
-        self.inputs, self.target = self.formatGNNInput(df)
+        self.inputs, self.target = self.formatGNNInput(df, subset_x)
+        self.inputs = self.inputs.type(torch.FloatTensor)
+        self.target = self.target.type(torch.FloatTensor)
+        
+        if subset_x is not None and len(subset_x) == 2:
+            self.inputs = self.inputs.squeeze()
+        
         print("Generated Sequences")
         
     def __len__(self):
@@ -109,7 +142,7 @@ class energyDataset(Dataset):
         return self.inputs[index], self.target[index]
     
     
-    def formatGNNInput(self, df):
+    def formatGNNInput(self, df, subset_x):
         """
         splits our dataframe into separate nodes and then splits the sequences for each
         Converts 3d input (num_obs, time, variables) for each node into a 3d input (num_obs, node, time, variables)
@@ -123,7 +156,8 @@ class energyDataset(Dataset):
         for d in split_dfs:
             d = d.reset_index()
             start_idx =  d.index[d['hour'].isin([0,12])].tolist()
-            inputs_tmp, target_tmp = split_sequences(d, start_idx,
+            
+            inputs_tmp, target_tmp = splitSequences(d, start_idx, subset_x = subset_x,
                                                      historical = self.historical_len,
                                                      forecast = self.forecast_len)       
             inputs.append(inputs_tmp)
@@ -131,23 +165,5 @@ class energyDataset(Dataset):
             
         return torch.stack(inputs).transpose(0,1), \
                 torch.stack(targets).transpose(0,1)
-
-
-
-"""
-processed_dir = "./data/processed/"
-
-df = pd.read_parquet(processed_dir + "Energy Demand Data (Partial).parquet")
-df = df[df['node'].astype(int) < 4] # for testing
-df.head()
-
-processed = processData(df)
-dataset = energyDataset(df, processing_function = processData)
-dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
-
-
-for x, y in dataloader:
-    print(x.shape)
-    print(y.shape)
-    break
-"""
+        
+   
