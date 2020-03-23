@@ -25,9 +25,9 @@ import math
 def loadEnergyData(processed_dir, incl_nodes = "All", partial = False):
     # load features
     if partial:
-        energy_demand = pd.read_parquet(processed_dir + "Energy Demand Data (Partial).parquet")
+        energy_demand = pd.read_parquet(processed_dir + "EnergyDemandData_Partial.parquet")
     else:
-        energy_demand = pd.read_parquet(processed_dir + "Energy Demand Data.parquet")
+        energy_demand = pd.read_parquet(processed_dir + "EnergyDemandData.parquet")
         
     # load adjacency matrix
     adj_mat = np.load(processed_dir + "adjacency_matrix.npy")
