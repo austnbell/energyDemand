@@ -19,6 +19,7 @@ import torch
 from sklearn import preprocessing
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset, DataLoader
+import math
 
 # Load feature data and graph data
 def loadEnergyData(processed_dir, incl_nodes = "All", partial = False):
@@ -41,7 +42,56 @@ def loadEnergyData(processed_dir, incl_nodes = "All", partial = False):
     # I may need to do some normalization for the adjacency matrix here
         
     return energy_demand, adj_mat
+  
+# convert data into datasets
+# will add option for test loader too later
+def getDatasets(energy_demand, validation_range, historical_input, forecast_output, subset_x = None):
+    energy_demand['time'] = pd.to_datetime(energy_demand['time'], format='%Y-%m-%d %H:%M:%S')
     
+    # extract validation and training sets
+    train_df = energy_demand[energy_demand['time'] < validation_range[0]].reset_index(drop = True)
+    val_df = energy_demand[(energy_demand['time'] >= validation_range[0]) & 
+                           (energy_demand['time'] <= validation_range[1])].reset_index(drop = True)
+    
+    
+    # get dataloaders
+    train_dataset = energyDataset(train_df, subset_x = subset_x,
+                                  historical_len = historical_input, 
+                                  forecast_len = forecast_output, 
+                                  processing_function = processData)
+    
+    
+    val_dataset = energyDataset(val_df, subset_x = subset_x,
+                                historical_len = historical_input, 
+                                forecast_len = forecast_output, 
+                                processing_function = processData)
+    
+
+    return train_dataset, val_dataset
+
+
+# Normalized adjacency matrix with self loop 
+# if A is not normalized we will completely change the scale of the feature vectors during our net
+# since we do A*H*W
+def normalizeAdjMat(adj_mat):
+    # add self loop - ensures that a node's own features are included in calculations by creating an edge to itself
+    n = adj_mat.shape[0]
+    adj_mat = adj_mat +  np.diag(np.ones(n, dtype=np.float32))
+    
+    # generate node degree matrix
+    D = np.zeros((n, n), float)
+    np.fill_diagonal(D, np.sum(adj_mat, axis = 1))
+    
+    # get D^-(1/2)
+    D_norm = D**(-(1/2))
+    D_norm[D_norm==math.inf] =0  # handle infs 
+    
+    # Normalization formula is  D^(−1/2) * A * D^(−1/2)
+    norm_adj_mat = np.matmul(np.matmul(D_norm, adj_mat), D_norm)  
+    return torch.FloatTensor(norm_adj_mat)
+
+
+
 
 # very basic preprocessing
 def processData(df, sol_wind_type = "ecmwf"):
