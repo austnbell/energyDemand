@@ -46,8 +46,8 @@ args = dotDict({
         "historical_input": 24, # timestep inputs
         "forecast_output": 24, # timstep outputs
         "subset_feats": None, # subset features to include? None is include ass
-        "save_seq": True, # save our sequences instead of splitting
-        "load_seq": False, # load our sequences
+        "save_seq": False, # save our sequences instead of splitting
+        "load_seq": True, # load our sequences
         "seq_path": "./data/processed/nodeSequences", # path to saved sequences
         "processing_function": processData, # data processing function to use
         
@@ -70,12 +70,12 @@ processed_dir = "./data/processed/"
 if args.load_seq:
     # get number of nodes to include
     files = os.listdir(args.seq_path)
-    incl_nodes = max([int(re.search("\d", f).group(0)) for f in files])
+    incl_nodes = max([int(re.search("\d{1,5}", f).group(0)) for f in files])
     
-    _, adj_mat = loadEnergyData(processed_dir, incl_nodes = incl_nodes, partial = False)
+    _, adj_mat = loadEnergyData(processed_dir, incl_nodes = incl_nodes, partial = True)
     energy_demand = None
 else:
-    energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 1050, partial = False)
+    energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 20, partial = True)
 
 # format for pytorch
 train_dataset, val_dataset = getDatasets(args, energy_demand, validation_range)
