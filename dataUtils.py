@@ -18,8 +18,8 @@ import numpy as np
 import torch
 from sklearn import preprocessing
 from sklearn.preprocessing import MinMaxScaler
-from torch.utils.data import Dataset, DataLoader
-import math
+from torch.utils.data import Dataset
+import math, gc, os, re 
 
 # Load feature data and graph data
 def loadEnergyData(processed_dir, incl_nodes = "All", partial = False):
@@ -45,27 +45,40 @@ def loadEnergyData(processed_dir, incl_nodes = "All", partial = False):
   
 # convert data into datasets
 # will add option for test loader too later
-def getDatasets(energy_demand, validation_range, historical_input, forecast_output, subset_x = None):
-    energy_demand['time'] = pd.to_datetime(energy_demand['time'], format='%Y-%m-%d %H:%M:%S')
-    
-    # extract validation and training sets
-    train_df = energy_demand[energy_demand['time'] < validation_range[0]].reset_index(drop = True)
-    val_df = energy_demand[(energy_demand['time'] >= validation_range[0]) & 
-                           (energy_demand['time'] <= validation_range[1])].reset_index(drop = True)
-    
-    
-    # get dataloaders
-    train_dataset = energyDataset(train_df, subset_x = subset_x,
-                                  historical_len = historical_input, 
-                                  forecast_len = forecast_output, 
-                                  processing_function = processData)
+def getDatasets(args, energy_demand = None, validation_range = None):
+      
+    # get dataset shells
+    train_dataset = energyDataset(args,
+                                  historical_len = args.historical_input, 
+                                  forecast_len = args.forecast_output, 
+                                  processing_function = args.processing_function,
+                                  data_type = "train")
     
     
-    val_dataset = energyDataset(val_df, subset_x = subset_x,
-                                historical_len = historical_input, 
-                                forecast_len = forecast_output, 
-                                processing_function = processData)
+    val_dataset = energyDataset(args, 
+                                historical_len = args.historical_input, 
+                                forecast_len = args.forecast_output, 
+                                processing_function = args.processing_function,
+                                data_type = "val")
     
+    # load or generate our sequences
+    if args.load_seq:
+        train_dataset.loadSequences()
+        val_dataset.loadSequences()
+        
+    else: 
+        assert energy_demand is not None and validation_range is not None
+        energy_demand['time'] = pd.to_datetime(energy_demand['time'], format='%Y-%m-%d %H:%M:%S')
+    
+        # extract validation and training sets
+        train_df = energy_demand[energy_demand['time'] < validation_range[0]].reset_index(drop = True)
+        val_df = energy_demand[(energy_demand['time'] >= validation_range[0]) & 
+                               (energy_demand['time'] <= validation_range[1])].reset_index(drop = True)
+        
+      
+        # generate our actual sequences
+        train_dataset.generateSequences(train_df)
+        val_dataset.generateSequences(val_df)
 
     return train_dataset, val_dataset
 
@@ -123,7 +136,7 @@ def processData(df, sol_wind_type = "ecmwf"):
 
 
 # split our sequences to incorporate historical data and the predicted values 
-def splitSequences(df, start_idx, subset_x = None, historical = 72, forecast = 24):
+def splitSequences(df, start_idx, subset_feats = None, historical = 72, forecast = 24):
 
     # extract all 0 and 12 hour indices
     df = df.drop(columns = "time")
@@ -144,8 +157,8 @@ def splitSequences(df, start_idx, subset_x = None, historical = 72, forecast = 2
         y_nodes = list(y.node.unique())
         
         # only include a subset of featurres
-        if subset_x is not None:
-            X = X.loc[:, subset_x]
+        if subset_feats is not None:
+            X = X.loc[:, subset_feats]
 
         if len(X_nodes) > 1 or y_nodes != X_nodes:
             continue
@@ -164,26 +177,21 @@ def splitSequences(df, start_idx, subset_x = None, historical = 72, forecast = 2
 
 # core dataset class - only set up for LSTM now
 class energyDataset(Dataset):
-    def __init__(self, df, start_values = [0, 12], subset_x = None, 
+    def __init__(self, args, start_values = [0, 12], 
                  historical_len = 72, forecast_len = 24, 
-                 processing_function = None):
+                 processing_function = None, data_type = None):
         
+        # init
+        self.save_seq = args.save_seq
+        if self.save_seq:
+            self.seq_path = args.seq_path
         
-        # TODO: allowing passing of parameters to processign funtion if necessary
-        if processing_function is not None:
-            df = processing_function(df)
-            print("Processed Data")
-        
+        self.data_type = data_type
+        self.args = args
         self.historical_len = historical_len
         self.forecast_len = forecast_len
-        self.inputs, self.target = self.formatGNNInput(df, subset_x)
-        self.inputs = self.inputs.type(torch.FloatTensor)
-        self.target = self.target.type(torch.FloatTensor)
         
-        if subset_x is not None and len(subset_x) == 2:
-            self.inputs = self.inputs.squeeze()
         
-        print("Generated Sequences")
         
     def __len__(self):
         return len(self.inputs)
@@ -191,8 +199,49 @@ class energyDataset(Dataset):
     def __getitem__(self, index):
         return self.inputs[index], self.target[index]
     
+    # load our sequences from file paths
+    def loadSequences(self):
+        files = os.listdir(self.args.seq_path)
+        
+        # subset to datatype and file type
+        files = [f for f in files if re.search(self.data_type, f)]
+        data_files = [f for f in files if re.search("data", f)]
+        target_files = [f for f in files if re.search("target", f)]
+        
+        # now load and add to dataset
+        inputs = []
+        targets = []
+        for input_file, target_file in zip(data_files, target_files):
+            inputs.append(torch.load(os.path.join(self.args.seq_path, input_file)))
+            targets.append(torch.load(os.path.join(self.args.seq_path, target_file)))
+            
+        self.inputs = torch.stack(inputs).transpose(0,1).type(torch.FloatTensor)
+        self.target = torch.stack(targets).transpose(0,1).type(torch.FloatTensor)
+        
+        if self.args.subset_feats is not None and len(self.args.subset_feats) == 2:
+                self.inputs = self.inputs.squeeze()
     
-    def formatGNNInput(self, df, subset_x):
+    # create our sequences from our base dataset
+    def generateSequences(self, df):
+        # TODO: allowing passing of parameters to processign funtion if necessary
+        if self.args.processing_function is not None:
+            df = self.args.processing_function(df)
+            print("Processed Data")
+            
+        # do not return anything if we are saving - conserve memory
+        if self.save_seq:
+            self.formatGNNInput(df, self.args)
+        else:
+            self.inputs, self.target = self.formatGNNInput(df, self.args)
+            self.inputs = self.inputs.type(torch.FloatTensor)
+            self.target = self.target.type(torch.FloatTensor)
+            
+            if self.args.subset_feats is not None and len(self.args.subset_feats) == 2:
+                self.inputs = self.inputs.squeeze()
+    
+        print("Generated Sequences")
+    
+    def formatGNNInput(self, df, args):
         """
         splits our dataframe into separate nodes and then splits the sequences for each
         Converts 3d input (num_obs, time, variables) for each node into a 3d input (num_obs, node, time, variables)
@@ -201,19 +250,35 @@ class energyDataset(Dataset):
 
         # split our processed dataframes
         split_dfs = [x for _, x in df.groupby('node')]
+        del df
+        gc.collect()
         
+        # for each group we generate our time series sequences 
         inputs, targets = [],[]
         for d in split_dfs:
             d = d.reset_index()
+            node = d.node[0]
+            print(node)
+            
             start_idx =  d.index[d['hour'].isin([0,12])].tolist()
             
-            inputs_tmp, target_tmp = splitSequences(d, start_idx, subset_x = subset_x,
-                                                     historical = self.historical_len,
-                                                     forecast = self.forecast_len)       
-            inputs.append(inputs_tmp)
-            targets.append(target_tmp)
+            inputs_tmp, target_tmp = splitSequences(d, start_idx, 
+                                                    subset_feats = args.subset_feats,
+                                                    historical = self.historical_len,
+                                                    forecast = self.forecast_len)       
             
-        return torch.stack(inputs).transpose(0,1), \
-                torch.stack(targets).transpose(0,1)
-        
+            
+            if self.save_seq:
+                # save our node data
+                torch.save(inputs_tmp, os.path.join(self.seq_path, 'node_seq_data_' + str(node) + "_" + str(self.data_type) + '.pt'))
+                torch.save(target_tmp, os.path.join(self.seq_path, 'node_seq_target_' + str(node) + "_" + str(self.data_type) + '.pt'))
+            
+            else:
+                inputs.append(inputs_tmp)
+                targets.append(target_tmp)
+                
+        if not self.save_seq:
+            return torch.stack(inputs).transpose(0,1), \
+                    torch.stack(targets).transpose(0,1)
+            
    

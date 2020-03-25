@@ -7,7 +7,8 @@ currently does not work when we exceed 20 nodes
 @author: Austin Bell
 """
 
-import os
+
+import os, sys
 import argparse
 import pickle 
 import pandas as pd
@@ -15,7 +16,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 import time
-import math
+import math, re
 
 # ML
 import torch
@@ -27,7 +28,7 @@ from pytorch_classification.utils import Bar, AverageMeter
 # user functions
 from dataUtils import loadEnergyData, processData, energyDataset, getDatasets, normalizeAdjMat
 from models.baseSTGCN import STGCN
-from modelUtils import saveCheckpoint, loadCheckpoint, plotPredVsTrue
+from modelUtils import saveCheckpoint, loadCheckpoint, plotPredVsTrue, dotDict
 
 ########################################################################################
 # Parameters
@@ -35,20 +36,28 @@ from modelUtils import saveCheckpoint, loadCheckpoint, plotPredVsTrue
 torch.manual_seed(0)
 np.random.seed(0)
 
-historical_input = 48
-forecast_output = 24
-
 # last three months - will add test set later
 validation_range = ["2014-10-01 00:00:00", "2014-12-31 23:00:00"]
 validation_range = [datetime.strptime(date, '%Y-%m-%d %H:%M:%S') for date in validation_range]
 
 # will replace with argparse later
-args = {
+args = dotDict({
+        # data params
+        "historical_input": 24, # timestep inputs
+        "forecast_output": 24, # timstep outputs
+        "subset_feats": None, # subset features to include? None is include ass
+        "save_seq": True, # save our sequences instead of splitting
+        "load_seq": False, # load our sequences
+        "seq_path": "./data/processed/nodeSequences", # path to saved sequences
+        "processing_function": processData, # data processing function to use
+        
+        # model params
         "device": "cuda" if torch.cuda.is_available() else "cpu",
         "epochs": 200,
-        "batch_size": 32,
+        "batch_size": 128,
         "lr": .001
-}
+})
+
 
 # data directories
 processed_dir = "./data/processed/"
@@ -56,14 +65,27 @@ processed_dir = "./data/processed/"
 ########################################################################################
 # Data Prep
 ########################################################################################
-energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 100, partial = False)
 
+# only load energy demand if we are not loading our data
+if args.load_seq:
+    # get number of nodes to include
+    files = os.listdir(args.seq_path)
+    incl_nodes = max([int(re.search("\d", f).group(0)) for f in files])
+    
+    _, adj_mat = loadEnergyData(processed_dir, incl_nodes = incl_nodes, partial = False)
+    energy_demand = None
+else:
+    energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 1050, partial = False)
 
-train_dataset, val_dataset = getDatasets(energy_demand, validation_range,
-                                         historical_input, forecast_output)
+# format for pytorch
+train_dataset, val_dataset = getDatasets(args, energy_demand, validation_range)
 
-train_loader = DataLoader(train_dataset, batch_size=args['batch_size'], shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=args['batch_size'], shuffle=False)
+# stop if we are just save sequences
+if args.save_seq:
+    sys.exit()
+
+train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
 
 # normalized adjacency matrix with self loop
@@ -71,21 +93,20 @@ adj_norm = normalizeAdjMat(adj_mat)
 
     
 
-
 ########################################################################################
 # Network Definition
 ########################################################################################
-num_nodes = len(energy_demand.node.unique())
+num_nodes = train_dataset.target.shape[1]
 num_features = train_dataset.inputs.shape[3]
 
 # Model init
 Gnet = STGCN(num_nodes,
              num_features,
-             historical_input,
-             forecast_output).to(device=args['device'])
+             args.historical_input,
+             args.forecast_output).to(device=args.device)
 
 # SGD and Loss
-optimizer = torch.optim.Adam(Gnet.parameters(), lr=args['lr'])
+optimizer = torch.optim.Adam(Gnet.parameters(), lr=args.lr)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=40, gamma=0.25)
 
 criterion = nn.MSELoss()
@@ -98,7 +119,7 @@ val_best = 1
 # Training the Network
 ########################################################################################
 
-for epoch in range(args['epochs']):
+for epoch in range(args.epochs):
     print("Epoch Number: " + str(epoch + 1))
     
     
@@ -109,10 +130,10 @@ for epoch in range(args['epochs']):
     epoch_trn_loss = []
     epoch_val_loss = []
     
-    bar = Bar('Training Graph Net', max=int(len(train_dataset.inputs)/args['batch_size']))
+    bar = Bar('Training Graph Net', max=int(len(train_dataset.inputs)/args.batch_size))
     end = time.time()
     
-    adj_norm = adj_norm.to(args['device']) 
+    adj_norm = adj_norm.to(args.device) 
     
     
     ###########################################################
@@ -120,8 +141,8 @@ for epoch in range(args['epochs']):
     ###########################################################
     Gnet.train()
     for batch_idx, (features, target) in enumerate(train_loader):
-        features = features.to(args['device'])
-        target = target.to(args['device'])
+        features = features.to(args.device)
+        target = target.to(args.device)
         
         optimizer.zero_grad()
         
@@ -134,7 +155,7 @@ for epoch in range(args['epochs']):
         
         # update tracking
         np_loss = loss.detach().cpu().numpy()
-        avg_trn_loss.update(np_loss, args['batch_size'])
+        avg_trn_loss.update(np_loss, args.batch_size)
         epoch_trn_loss.append(np_loss)
         
         # plot progress 
@@ -154,8 +175,8 @@ for epoch in range(args['epochs']):
     with torch.no_grad():
         Gnet.eval()
         for vbatch_idx, (vfeatures, vtarget) in enumerate(val_loader):
-            vfeatures = vfeatures.to(args['device'])
-            vtarget = vtarget.to(args['device'])
+            vfeatures = vfeatures.to(args.device)
+            vtarget = vtarget.to(args.device)
             
             vpreds = Gnet(vfeatures, adj_norm)
             vloss = criterion(vpreds, vtarget)
@@ -166,7 +187,7 @@ for epoch in range(args['epochs']):
             np_vloss = vloss.detach().cpu().numpy()
             np_vpreds = vpreds.detach().cpu().numpy()
             np_vtarget = vtarget.detach().cpu().numpy()
-            avg_val_loss.update(np_vloss, args['batch_size'])
+            avg_val_loss.update(np_vloss, args.batch_size)
             epoch_val_loss.append(np_vloss)
             val_predictions.append(np_vpreds)
             val_target.append(np_vtarget)

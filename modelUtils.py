@@ -42,3 +42,8 @@ def loadCheckpoint(model, folder='savedModels/checkpoint', filename='checkpoint.
     model.load_state_dict(checkpoint['state_dict'])
     return model
 
+
+# stand in for argsparser
+class dotDict(dict):
+    def __getattr__(self, name):
+        return self[name]
