@@ -46,8 +46,8 @@ args = dotDict({
         "historical_input": 24, # timestep inputs
         "forecast_output": 24, # timstep outputs
         "subset_feats": None, # subset features to include? None is include ass
-        "save_seq": True, # save our sequences instead of splitting
-        "load_seq": False, # load our sequences
+        "save_seq": False, # save our sequences instead of splitting
+        "load_seq": True, # load our sequences
         "seq_path": "./data/processed/nodeSequences", # path to saved sequences
         "processing_function": processData, # data processing function to use
         
@@ -72,6 +72,7 @@ if args.load_seq:
     files = os.listdir(args.seq_path)
     incl_nodes = max([int(re.search("\d", f).group(0)) for f in files])
     
+    print("loading data")
     _, adj_mat = loadEnergyData(processed_dir, incl_nodes = incl_nodes, partial = False)
     energy_demand = None
 else:
@@ -86,6 +87,7 @@ if args.save_seq:
 
 train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+print("loaded Data Loaders")
 
 
 # normalized adjacency matrix with self loop
