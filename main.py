@@ -70,13 +70,13 @@ processed_dir = "./data/processed/"
 if args.load_seq:
     # get number of nodes to include
     files = os.listdir(args.seq_path)
-    incl_nodes = max([int(re.search("\d", f).group(0)) for f in files])
+    incl_nodes = max([int(re.search("\d{1,5}", f).group(0)) for f in files])
     
     print("loading data")
     _, adj_mat = loadEnergyData(processed_dir, incl_nodes = incl_nodes, partial = False)
     energy_demand = None
 else:
-    energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 1050, partial = False)
+    energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 20, partial = True)
 
 # format for pytorch
 train_dataset, val_dataset = getDatasets(args, energy_demand, validation_range)
