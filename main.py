@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import time
 import math, re
+import gc
 
 # ML
 import torch
@@ -45,7 +46,7 @@ args = dotDict({
         # data params
         "historical_input": 24, # timestep inputs
         "forecast_output": 24, # timstep outputs
-        "subset_feats": None, # subset features to include? None is include ass
+        "subset_feats": ['load', 'node', "solar_ecmwf", "wind_ecmwf"], # subset features to include? None is include ass
         "save_seq": False, # save our sequences instead of splitting
         "load_seq": True, # load our sequences
         "seq_path": "./data/processed/nodeSequences", # path to saved sequences
@@ -54,8 +55,8 @@ args = dotDict({
         # model params
         "device": "cuda" if torch.cuda.is_available() else "cpu",
         "epochs": 200,
-        "batch_size": 128,
-        "lr": .001
+        "batch_size": 64,
+        "lr": .01
 })
 
 
@@ -93,13 +94,15 @@ print("loaded Data Loaders")
 # normalized adjacency matrix with self loop
 adj_norm = normalizeAdjMat(adj_mat)
 
-    
-
 ########################################################################################
 # Network Definition
 ########################################################################################
 num_nodes = train_dataset.target.shape[1]
 num_features = train_dataset.inputs.shape[3]
+
+del train_dataset, val_dataset, adj_mat
+gc.collect()
+
 
 # Model init
 Gnet = STGCN(num_nodes,
@@ -109,7 +112,7 @@ Gnet = STGCN(num_nodes,
 
 # SGD and Loss
 optimizer = torch.optim.Adam(Gnet.parameters(), lr=args.lr)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=40, gamma=0.25)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
 
 criterion = nn.MSELoss()
 
@@ -132,7 +135,7 @@ for epoch in range(args.epochs):
     epoch_trn_loss = []
     epoch_val_loss = []
     
-    bar = Bar('Training Graph Net', max=int(len(train_dataset.inputs)/args.batch_size))
+    #bar = Bar('Training Graph Net', max=int(len(train_dataset.inputs)/args.batch_size))
     end = time.time()
     
     adj_norm = adj_norm.to(args.device) 
