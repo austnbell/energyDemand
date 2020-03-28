@@ -45,7 +45,7 @@ args = dotDict({
         # data params
         "historical_input": 24, # timestep inputs
         "forecast_output": 24, # timstep outputs
-        "subset_feats": None, # subset features to include? None is include ass
+        "subset_feats": ['load', 'node'], # subset features to include? None is include ass
         "save_seq": False, # save our sequences instead of splitting
         "load_seq": True, # load our sequences
         "seq_path": "./data/processed/nodeSequences", # path to saved sequences
@@ -224,7 +224,7 @@ plt.plot(val_loss, label = "Validation Loss")
 plt.legend()
 #plt.ylim(0,.1)
  
-#plotPredVsTrue(val_target, val_predictions, 18, 3)
+#plotPredVsTrue(val_target, val_predictions, 10, 1)
 
 
 #Gnet = loadCheckpoint(Gnet, filename = "initial model.pth")
