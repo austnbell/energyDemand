@@ -30,13 +30,16 @@ class temporalConv(nn.Module):
         """
         
         self.conv1 = nn.Conv2d(in_feats, out_feats, (1, kernel_size))  # causal with (1,k) kernel
-        self.conv2 = nn.Conv2d(in_feats, out_feats, (1, kernel_size)) 
+        self.conv2 = nn.Conv2d(in_feats, out_feats, (1, kernel_size))
+        self.conv3 = nn.Conv2d(in_feats, out_feats, (1, kernel_size))
+
         
     def forward(self, X):
         # input into conv2d is (batch_size, num_feats, num_nodes, timestep_len)
         # we feed the network (batch_size, num_nodes, timestep_len, num_feats) - so we need to change
         X = X.permute(0, 3, 1, 2)
         h = self.conv1(X) * torch.sigmoid(self.conv2(X))
+        h = F.relu(h + self.conv3(X))
         
         return h.permute(0,2,3,1)
 
