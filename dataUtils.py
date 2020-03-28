@@ -45,7 +45,7 @@ def loadEnergyData(processed_dir, incl_nodes = "All", partial = False):
   
 # convert data into datasets
 # will add option for test loader too later
-def getDatasets(args, energy_demand = None, validation_range = None):
+def getDatasets(args, energy_demand = None, validation_range = None, validation_only = False):
       
     # get dataset shells
     train_dataset = energyDataset(args,
@@ -63,7 +63,8 @@ def getDatasets(args, energy_demand = None, validation_range = None):
     
     # load or generate our sequences
     if args.load_seq:
-        train_dataset.loadSequences()
+        if not validation_only:
+            train_dataset.loadSequences()
         val_dataset.loadSequences()
         
     else: 
@@ -77,7 +78,8 @@ def getDatasets(args, energy_demand = None, validation_range = None):
         
       
         # generate our actual sequences
-        train_dataset.generateSequences(train_df)
+        if not validation_only:
+            train_dataset.generateSequences(train_df)
         val_dataset.generateSequences(val_df)
 
     return train_dataset, val_dataset

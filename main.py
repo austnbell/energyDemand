@@ -18,6 +18,7 @@ from datetime import datetime
 import time
 import math, re
 import gc
+import importlib
 
 # ML
 import torch
@@ -41,24 +42,12 @@ np.random.seed(0)
 validation_range = ["2014-10-01 00:00:00", "2014-12-31 23:00:00"]
 validation_range = [datetime.strptime(date, '%Y-%m-%d %H:%M:%S') for date in validation_range]
 
-# will replace with argparse later
-args = dotDict({
-        # data params
-        "historical_input": 24, # timestep inputs
-        "forecast_output": 24, # timstep outputs
-        "subset_feats": ['load', 'node', "solar_ecmwf", "wind_ecmwf"], # subset features to include? None is include ass
-        "save_seq": False, # save our sequences instead of splitting
-        "load_seq": True, # load our sequences
-        "seq_path": "./data/processed/nodeSequences", # path to saved sequences
-        "processing_function": processData, # data processing function to use
-        
-        # model params
-        "device": "cuda" if torch.cuda.is_available() else "cpu",
-        "epochs": 200,
-        "batch_size": 64,
-        "lr": .01
-})
+##### Load our args
+config_file = "testing_config"
+c = importlib.import_module("configs."+config_file)
+args = c.args
 
+print(args)
 
 # data directories
 processed_dir = "./data/processed/"
@@ -77,10 +66,11 @@ if args.load_seq:
     _, adj_mat = loadEnergyData(processed_dir, incl_nodes = incl_nodes, partial = False)
     energy_demand = None
 else:
-    energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 20, partial = True)
+    #energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 10, partial = True)
+    pass
 
 # format for pytorch
-train_dataset, val_dataset = getDatasets(args, energy_demand, validation_range)
+#train_dataset, val_dataset = getDatasets(args, energy_demand, validation_range)
 
 # stop if we are just save sequences
 if args.save_seq:
@@ -100,7 +90,7 @@ adj_norm = normalizeAdjMat(adj_mat)
 num_nodes = train_dataset.target.shape[1]
 num_features = train_dataset.inputs.shape[3]
 
-del train_dataset, val_dataset, adj_mat
+#del train_dataset, val_dataset, adj_mat
 gc.collect()
 
 
@@ -112,7 +102,7 @@ Gnet = STGCN(num_nodes,
 
 # SGD and Loss
 optimizer = torch.optim.Adam(Gnet.parameters(), lr=args.lr)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.5)
 
 criterion = nn.MSELoss()
 
@@ -154,6 +144,7 @@ for epoch in range(args.epochs):
         
         predicted = Gnet(features, adj_norm)
         loss = criterion(predicted, target)
+        #sys.exit()
         
         loss.backward()
         optimizer.step()
@@ -214,9 +205,11 @@ for epoch in range(args.epochs):
     # TODO: If validation imporves then save model 
     if val_loss[-1] < val_best:
         val_best = val_loss[-1]
-        saveCheckpoint(Gnet, filename = "initial model.pth")
+        saveCheckpoint(Gnet, filename = args.model_name)
 
     # show results
+    #print(val_target[0][0], val_predictions[0][0])
+    #print(val_target[0][1], val_predictions[0][1])
     print("Current Training Loss: " + str(round(train_loss[-1], 8)))
     print("Current Validation Loss: " + str(round(val_loss[-1], 8)))
     print("\n")
@@ -227,10 +220,12 @@ plt.title('Train & Validation MSE Loss')
 plt.plot(train_loss, label = "Training Loss")
 plt.plot(val_loss, label = "Validation Loss")
 plt.legend()
+plt.show()
 #plt.ylim(0,.1)
  
-#plotPredVsTrue(val_target, val_predictions, 10, 1)
+#plotPredVsTrue(val_target, val_predictions, 10, 3)
 
+#val_predictions[0][0], val_predictions[0][1]
 
 #Gnet = loadCheckpoint(Gnet, filename = "initial model.pth")
 

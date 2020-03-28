@@ -34,12 +34,14 @@ class temporalConv(nn.Module):
         self.conv3 = nn.Conv2d(in_feats, out_feats, (1, kernel_size))
 
         
-    def forward(self, X):
+    def forward(self, X, activation = True):
         # input into conv2d is (batch_size, num_feats, num_nodes, timestep_len)
         # we feed the network (batch_size, num_nodes, timestep_len, num_feats) - so we need to change
         X = X.permute(0, 3, 1, 2)
-        h = self.conv1(X) * torch.sigmoid(self.conv2(X))
-        h = F.relu(h + self.conv3(X))
+        h = self.conv1(X) * torch.tanh(self.conv2(X))
+        #h = F.relu(h1 + self.conv3(X))
+        if activation:
+            h = torch.tanh(h + self.conv3(X))
         
         return h.permute(0,2,3,1)
 
@@ -85,12 +87,15 @@ class spatioTemporalBlock(nn.Module):
            
     def forward(self, X, adj_norm):
         temp1 = self.t1(X)
+        #print("temporal1 convolution:", temp1[0,0,:,:], temp1[0,1,:,:])
         
         #spatial1 = self.gconv(temp1, adj_norm)
         support = torch.einsum("ij,jklm->kilm", [adj_norm, temp1.permute(1, 0, 2, 3)])
         spatial1 = torch.matmul(support, self.theta) 
+        #print("Spatial Block",  spatial1[0,0,:,:], spatial1[0,1,:,:])
         
-        out = self.t2(F.relu(spatial1))
+        out = self.t2(F.relu(spatial1), activation = False)
+        #print("2nd Temporal Convolution", out[0,0,:,:], out[0,1,:,:])
         return self.batch_norm(out)
 
 
@@ -121,6 +126,9 @@ class STGCN(nn.Module):
     def forward(self, features, adj_norm):
         h1 = self.block1(features, adj_norm)
         h2 = self.block2(h1, adj_norm)
-        h3 = self.final_temporal(h2)
+        #print(h2)
+        h3 = self.final_temporal(h2, activation = False)
+        #print(h3[0,0,:,:],h3[0,1,:,:])
         out = self.fc_out(h3.reshape((h3.shape[0], h3.shape[1], -1)))
+        #print(out[0,0,:],out[0,1,:])
         return out
