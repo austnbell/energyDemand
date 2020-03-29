@@ -60,17 +60,17 @@ processed_dir = "./data/processed/"
 if args.load_seq:
     # get number of nodes to include
     files = os.listdir(args.seq_path)
-    incl_nodes = max([int(re.search("\d{1,5}", f).group(0)) for f in files])
+    incl_nodes = max([int(re.search("\d{1,5}", f).group(0)) for f in files if re.search("\d", f)])
     
     print("loading data")
     _, adj_mat = loadEnergyData(processed_dir, incl_nodes = incl_nodes, partial = False)
     energy_demand = None
 else:
-    #energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 10, partial = True)
+    energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 225, partial = False)
     pass
 
 # format for pytorch
-#train_dataset, val_dataset = getDatasets(args, energy_demand, validation_range)
+train_dataset, val_dataset = getDatasets(args, energy_demand, validation_range)
 
 # stop if we are just save sequences
 if args.save_seq:
@@ -102,7 +102,7 @@ Gnet = STGCN(num_nodes,
 
 # SGD and Loss
 optimizer = torch.optim.Adam(Gnet.parameters(), lr=args.lr)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.5)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.steps, gamma=0.5)
 
 criterion = nn.MSELoss()
 
@@ -223,7 +223,7 @@ plt.legend()
 plt.show()
 #plt.ylim(0,.1)
  
-#plotPredVsTrue(val_target, val_predictions, 10, 3)
+plotPredVsTrue(val_target, val_predictions, 10, 2)
 
 #val_predictions[0][0], val_predictions[0][1]
 
