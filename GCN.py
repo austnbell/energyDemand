@@ -1,33 +1,42 @@
-import torch
+import dgl
+import dgl.function as fn
 import torch.nn as nn
-from dgl.nn.pytorch import GraphConv
+import torch.nn.functional as F
+from dgl import DGLGraph
 
+gcn_msg = fn.copy_src(src='h', out='m')
+gcn_reduce = fn.sum(msg='m', out='h')
+
+class NodeApplyModule(nn.Module):
+    def __init__(self, in_feats, out_feats, activation):
+        super(NodeApplyModule, self).__init__()
+        self.linear = nn.Linear(in_feats, out_feats)
+        self.activation = activation
+
+    def forward(self, node):
+        h = self.linear(node.data['h'])
+        if self.activation is not None:
+            h = self.activation(h)
+        return {'h' : h}
+    
 class GCN(nn.Module):
-    def __init__(self,
-                 g,
-                 in_feats,
-                 n_hidden,
-                 n_predict,
-                 n_layers,
-                 activation,
-                 dropout):
+    def __init__(self, in_feats, out_feats, activation):
         super(GCN, self).__init__()
-        self.g = g
-        self.layers = nn.ModuleList()
-        # input layer
-        self.layers.append(GraphConv(in_feats, n_hidden, activation=activation))
-        # hidden layers
-        for i in range(n_layers - 1):
-            self.layers.append(GraphConv(n_hidden, n_hidden, activation=activation))
-        # output layer
-        self.layers.append(nn.Linear(n_hidden ,n_predict))
-        self.dropout = nn.Dropout(p=dropout)
+        self.apply_mod = NodeApplyModule(in_feats, out_feats, activation)
 
+    def forward(self, g, feature):
+        g.ndata['h'] = feature
+        g.update_all(gcn_msg, gcn_reduce)
+        g.apply_nodes(func=self.apply_mod)
+        return g.ndata.pop('h')
+    
+class Net(nn.Module):
+    def __init__(self):
+        super(Net, self).__init__()
+        self.gcn1 = GCN(10, 16, F.relu)
+        self.gcn2 = GCN(16, 1, None)
 
-    def forward(self, features):
-        h = features
-        for i, layer in enumerate(self.layers):
-            if i != 0:
-                h = self.dropout(h)
-            h = layer(self.g, h)
-        return h
+    def forward(self, g, features):
+        x = self.gcn1(g, features)
+        x = self.gcn2(g, x)
+        return x
