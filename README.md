@@ -10,12 +10,14 @@ Should suffice, as long as args are correctly defined under the given config fil
 ./configs - Configuration files for main.py args   
 ./DGL.ipynb - Implementation of GCN with DGL 
 ./data - Model training data  
-./savedModels - checkpoints and training/testing statisitics  
+./savedModels - Model checkpoints and training/testing statisitics
+./evaluation - Evaluation scripts and statisitics
+./dataPrep - One-off notebooks for dataset cleaning and merging
 
 ## Description:
 GNNs and Benchmarks for Node-level Energy Load Forecasting.  
- * Implementats STGNN variants using [pytorch](https://pytorch.org/)
- * Implementation GCN using [DGL](dgl.ai)
+ * Implementation of STGNN variants using [pytorch](https://pytorch.org/)
+ * Implementation of GCN using [DGL](dgl.ai)
 
 ## Dependencies:  
 
@@ -32,6 +34,6 @@ GNNs and Benchmarks for Node-level Energy Load Forecasting.
 ### DataSet:
 * [RE-Europe](https://www.nature.com/articles/sdata2017175)
 ## TODO: 
-- Explore incorporating seq2seq with STGCN (e.g., Zhu et. al 2020) 
+- Explore incorporating seq2seq with STGCN (e.g., [Zhu et. al 2020](https://onlinelibrary.wiley.com/doi/abs/10.1002/ett.3890)) 
 - Vectorize and include date metadata (holidays, weekend, season, average load, etc.) + solar and wind forecasts  
 - Experiment tracking & hyperparam optimization 
