@@ -1,14 +1,14 @@
 # energyDemand
-COMSW4995: Austin Bell, Ziyin Wang, Malik Drabla
+COMSW4995: Austin Bell, Ziyin Wang, Malik Drabla 
 
-./main.py - Implements STGCN for node level energy forcasting.
-./configs - Configuration files for main.py args
+./main.py - Implements STGCN for node level energy forcasting.  
+./configs - Configuration files for main.py args . 
 Running: 
-  python main.py 
-Should suffice, as long as args are correctly defined under the given config file. If there are no train data, set the load_seq arg True.
-./DGL.ipynb - Implementation of GCN with DGL
-./data - Model training data
-./savedModels - checkpoints and training/testing statisitics
+  python main.py   
+Should suffice, as long as args are correctly defined under the given config file. If there are no train data, set the load_seq arg True.  
+./DGL.ipynb - Implementation of GCN with DGL 
+./data - Model training data  
+./savedModels - checkpoints and training/testing statisitics  
 
 Description:
 GNNs and Benchmarks for Node-level Load Forecasting
