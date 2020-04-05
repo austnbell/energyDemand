@@ -4,7 +4,6 @@ Created on Wed Mar 18 16:04:45 2020
 
 Uses just historical load data to predict future load 
 
-https://github.com/FelixOpolka/STGCN-PyTorch
 
 @author: Austin Bell
 """
