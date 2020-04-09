@@ -111,7 +111,7 @@ def normalizeAdjMat(adj_mat):
 # very basic preprocessing
 def processData(df, sol_wind_type = "ecmwf"):
     label_encoder = preprocessing.LabelEncoder() 
-    scaler = MinMaxScaler()
+    #scaler = MinMaxScaler()
     
     assert sol_wind_type in ['cosmo', 'ecmwf']
     if sol_wind_type == 'cosmo':
@@ -125,15 +125,15 @@ def processData(df, sol_wind_type = "ecmwf"):
     df['node'] = df['node'].astype(int)
     
     # normalize all data except the node ids and time
-    non_normalized_cols = ["node", "time", "solar_ecmwf", "wind_ecmwf", "holiday"]
-    node_time = df[non_normalized_cols]
-    df = df.drop(columns = non_normalized_cols)
+    #non_normalized_cols = ["node", "time", "solar_ecmwf", "wind_ecmwf", "holiday"]
+    #node_time = df[non_normalized_cols]
+    #df = df.drop(columns = non_normalized_cols)
     
     #df_normalized = pd.DataFrame(preprocessing.normalize(df), columns = df.columns)
-    df_normalized = pd.DataFrame(scaler.fit_transform(df), columns = df.columns)
+    #df_normalized = pd.DataFrame(scaler.fit_transform(df), columns = df.columns)
     
-    df_out = pd.concat([node_time, df_normalized], axis = 1)
-    return df_out
+    #df_out = pd.concat([node_time, df_normalized], axis = 1)
+    return df
 
 
 
@@ -153,7 +153,7 @@ def splitSequences(df, start_idx, subset_feats = None, historical = 72, forecast
     for i, idx in enumerate(start_idx):
         X = df.iloc[idx : idx+historical,:]
         
-        y = df.loc[idx+historical+1 : idx+historical+forecast, ["load", "node"]]
+        y = df.loc[idx+historical : idx+historical+forecast-1, ["load", "node"]]
         
         X_nodes = list(X.node.unique())
         y_nodes = list(y.node.unique())
@@ -209,6 +209,15 @@ class energyDataset(Dataset):
         files = [f for f in files if re.search(self.data_type, f)]
         data_files = [f for f in files if re.search("data", f)]
         target_files = [f for f in files if re.search("target", f)]
+        
+        # now we sort to ensure nodes are in the correct order (i.e., numeric ascending - node 1, node 2, node 3, ...)
+        data_files = [[file, int(re.search("\d{1,5}", file).group(0))] for file in data_files]
+        data_files = sorted(data_files, key = lambda x: x[1])
+        data_files = [file[0] for file in data_files]
+
+        target_files = [[file, int(re.search("\d{1,5}", file).group(0))] for file in target_files]
+        target_files = sorted(target_files, key = lambda x: x[1])
+        target_files = [file[0] for file in target_files]
         
         # now load and add to dataset
         inputs = []

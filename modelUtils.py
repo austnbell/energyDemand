@@ -13,6 +13,7 @@ def plotPredVsTrue(target, preds, time_slot_idx, node):
     y_true = target[time_slot_idx][node]
     y_preds = preds[time_slot_idx][node]
     
+    plt.figure(figsize=(14,6))
     plt.title('Gold Standard Vs. Predictions')
     plt.plot(y_preds, label = "Prediction Load")
     plt.plot(y_true, label = "Gold Standard Load")
