@@ -27,5 +27,6 @@ args = dotDict({
         "epochs": 200,
         "batch_size": 64,
         "lr": .001,
+        "steps": 50, 
         "model_name": "baselineSTGCN.pth"
 })

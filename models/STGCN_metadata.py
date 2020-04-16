@@ -99,13 +99,13 @@ class spatioTemporalBlock(nn.Module):
 
 
 
-class STGCN(nn.Module):
+class STGCN_metadata(nn.Module):
     """
     bringing everything together
     """
     def __init__(self, num_nodes, in_feats, num_timesteps_in, 
                  num_timesteps_predict, kernel_size = 3):
-        super(STGCN, self).__init__()
+        super(STGCN_metadata, self).__init__()
         
         self.block1 = spatioTemporalBlock(num_nodes, in_feats,
                                           out_feats = 64, 
@@ -120,14 +120,22 @@ class STGCN(nn.Module):
         
         # final temporal layor and output layer
         self.final_temporal = temporalConv(64, 64, kernel_size)
-        self.fc_out = nn.Linear((num_timesteps_in - ((kernel_size - 1) * 5))*64 ,num_timesteps_predict) # accounts for the length lost every temporal conv
+        self.fc_stgcn = nn.Linear((num_timesteps_in - ((kernel_size - 1) * 5))*64 ,num_timesteps_predict) # accounts for the length lost every temporal conv
         
-    def forward(self, features,metadata, adj_norm):
+        # metadata and output layer
+        self.fc_metadata = nn.Linear(3, 1)
+        self.fc_out = nn.Linear(num_timesteps_predict,num_timesteps_predict)
+        
+        
+    def forward(self, features, metadata, adj_norm):
+        # STGCN
         h1 = self.block1(features, adj_norm)
         h2 = self.block2(h1, adj_norm)
-        #print(h2)
         h3 = self.final_temporal(h2, activation = False)
-        #print(h3[0,0,:,:],h3[0,1,:,:])
-        out = self.fc_out(h3.reshape((h3.shape[0], h3.shape[1], -1)))
-        #print(out[0,0,:],out[0,1,:])
+        stgcn_out = torch.sigmoid(self.fc_stgcn(h3.reshape((h3.shape[0], h3.shape[1], -1))))
+        
+        # metadata
+        h_meta = self.fc_metadata(metadata)
+        out = self.fc_out(stgcn_out.add(h_meta))
+
         return out

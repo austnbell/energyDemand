@@ -16,10 +16,9 @@ currently implemented just for LSTM without spatial component. next step is to e
 import pandas as pd
 import numpy as np
 import torch
-from sklearn import preprocessing
-from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset
 import math, gc, os, re 
+from processData import processData, splitSequences
 
 # Load feature data and graph data
 def loadEnergyData(processed_dir, incl_nodes = "All", partial = False):
@@ -108,78 +107,13 @@ def normalizeAdjMat(adj_mat):
 
 
 
-# very basic preprocessing
-def processData(df, sol_wind_type = "ecmwf"):
-    label_encoder = preprocessing.LabelEncoder() 
-    #scaler = MinMaxScaler()
-    
-    assert sol_wind_type in ['cosmo', 'ecmwf']
-    if sol_wind_type == 'cosmo':
-        df = df.drop(columns = ['solar_ecmwf', 'wind_ecmwf'])
-    else: 
-        df = df.drop(columns = ['solar_cosmo', 'wind_cosmo'])
-    
-    # convert cat to numbers 
-    df['season'] = label_encoder.fit_transform(df['season']) 
-    df['country'] = label_encoder.fit_transform(df['country'])
-    df['node'] = df['node'].astype(int)
-    
-    # normalize all data except the node ids and time
-    #non_normalized_cols = ["node", "time", "solar_ecmwf", "wind_ecmwf", "holiday"]
-    #node_time = df[non_normalized_cols]
-    #df = df.drop(columns = non_normalized_cols)
-    
-    #df_normalized = pd.DataFrame(preprocessing.normalize(df), columns = df.columns)
-    #df_normalized = pd.DataFrame(scaler.fit_transform(df), columns = df.columns)
-    
-    #df_out = pd.concat([node_time, df_normalized], axis = 1)
-    return df
 
 
 
-# split our sequences to incorporate historical data and the predicted values 
-def splitSequences(df, start_idx, subset_feats = None, historical = 72, forecast = 24):
-
-    # extract all 0 and 12 hour indices
-    df = df.drop(columns = "time")
-    last_idx = df.index[-1]
-    
-    X_sequences = []
-    target = []
-    """
-    This is extremely inefficient right now, but prioritizing interpretability and easiness to code right now
-    Will probably need to update once we have settle on our final format
-    """
-    for i, idx in enumerate(start_idx):
-        X = df.iloc[idx : idx+historical,:]
-        
-        y = df.loc[idx+historical : idx+historical+forecast-1, ["load", "node"]]
-        
-        X_nodes = list(X.node.unique())
-        y_nodes = list(y.node.unique())
-        
-        # only include a subset of featurres
-        if subset_feats is not None:
-            X = X.loc[:, subset_feats]
-
-        if len(X_nodes) > 1 or y_nodes != X_nodes:
-            continue
-        
-        if idx+historical+forecast > last_idx:
-            break
-        
-        # append - for now we are ignoring nodes
-        X_sequences.append(np.array(X.drop(columns = "node")).astype(float).tolist())
-        target.append(y.load.tolist())
-        
-        
-    return torch.from_numpy(np.array(X_sequences)), \
-            torch.from_numpy(np.array(target))
-   
 
 # core dataset class - only set up for LSTM now
 class energyDataset(Dataset):
-    def __init__(self, args, start_values = [0, 12], 
+    def __init__(self, args, start_values = [0],#[0, 12], 
                  historical_len = 72, forecast_len = 24, 
                  processing_function = None, data_type = None):
         
@@ -199,7 +133,7 @@ class energyDataset(Dataset):
         return len(self.inputs)
     
     def __getitem__(self, index):
-        return self.inputs[index], self.target[index]
+        return self.inputs[index], self.metadata[index], self.target[index]
     
     # load our sequences from file paths
     def loadSequences(self):
@@ -207,7 +141,8 @@ class energyDataset(Dataset):
         
         # subset to datatype and file type
         files = [f for f in files if re.search(self.data_type, f)]
-        data_files = [f for f in files if re.search("data", f)]
+        data_files = [f for f in files if re.search("_data", f)]
+        meta_files = [f for f in files if re.search("metadata", f)]
         target_files = [f for f in files if re.search("target", f)]
         
         # now we sort to ensure nodes are in the correct order (i.e., numeric ascending - node 1, node 2, node 3, ...)
@@ -219,15 +154,22 @@ class energyDataset(Dataset):
         target_files = sorted(target_files, key = lambda x: x[1])
         target_files = [file[0] for file in target_files]
         
+        meta_files = [[file, int(re.search("\d{1,5}", file).group(0))] for file in meta_files]
+        meta_files = sorted(meta_files, key = lambda x: x[1])
+        meta_files = [file[0] for file in meta_files]
+        
         # now load and add to dataset
         inputs = []
         targets = []
-        for input_file, target_file in zip(data_files, target_files):
+        metadata = []
+        for input_file, target_file, meta_file in zip(data_files, target_files, meta_files):
             inputs.append(torch.load(os.path.join(self.args.seq_path, input_file)))
             targets.append(torch.load(os.path.join(self.args.seq_path, target_file)))
+            metadata.append(torch.load(os.path.join(self.args.seq_path, meta_file)))
             
         self.inputs = torch.stack(inputs).transpose(0,1).type(torch.FloatTensor)
         self.target = torch.stack(targets).transpose(0,1).type(torch.FloatTensor)
+        self.metadata = torch.stack(metadata).transpose(0,1).type(torch.FloatTensor)
         
         if self.args.subset_feats is not None and len(self.args.subset_feats) == 2:
                 self.inputs = self.inputs.squeeze()
@@ -243,9 +185,10 @@ class energyDataset(Dataset):
         if self.save_seq:
             self.formatGNNInput(df, self.args)
         else:
-            self.inputs, self.target = self.formatGNNInput(df, self.args)
+            self.inputs, self.target, self.metadata = self.formatGNNInput(df, self.args)
             self.inputs = self.inputs.type(torch.FloatTensor)
             self.target = self.target.type(torch.FloatTensor)
+            self.metadata = self.metadata.type(torch.FloatTensor)
             
             if self.args.subset_feats is not None and len(self.args.subset_feats) == 2:
                 self.inputs = self.inputs.squeeze()
@@ -265,7 +208,7 @@ class energyDataset(Dataset):
         gc.collect()
         
         # for each group we generate our time series sequences 
-        inputs, targets = [],[]
+        inputs, targets, metadata = [],[],[]
         for d in split_dfs:
             d = d.reset_index()
             node = d.node[0]
@@ -273,23 +216,27 @@ class energyDataset(Dataset):
             
             start_idx =  d.index[d['hour'].isin([0,12])].tolist()
             
-            inputs_tmp, target_tmp = splitSequences(d, start_idx, 
-                                                    subset_feats = args.subset_feats,
-                                                    historical = self.historical_len,
-                                                    forecast = self.forecast_len)       
+            inputs_tmp, target_tmp, meta_tmp = splitSequences(d, start_idx, 
+                                                        subset_feats = args.subset_feats,
+                                                        historical = self.historical_len,
+                                                        forecast = self.forecast_len)       
             
             
             if self.save_seq:
                 # save our node data
                 torch.save(inputs_tmp, os.path.join(self.seq_path, 'node_seq_data_' + str(node) + "_" + str(self.data_type) + '.pt'))
+                torch.save(meta_tmp, os.path.join(self.seq_path, 'node_seq_metadata_' + str(node) + "_" + str(self.data_type) + '.pt'))
                 torch.save(target_tmp, os.path.join(self.seq_path, 'node_seq_target_' + str(node) + "_" + str(self.data_type) + '.pt'))
+                
             
             else:
                 inputs.append(inputs_tmp)
                 targets.append(target_tmp)
+                metadata.append(meta_temp)
                 
         if not self.save_seq:
             return torch.stack(inputs).transpose(0,1), \
-                    torch.stack(targets).transpose(0,1)
+                    torch.stack(targets).transpose(0,1), \
+                    torch.stack(metadata).transpose(0,1)
             
    

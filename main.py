@@ -28,8 +28,9 @@ from pytorch_classification.utils import Bar, AverageMeter
 
 
 # user functions
-from dataUtils import loadEnergyData, processData, energyDataset, getDatasets, normalizeAdjMat
-from models.baseSTGCN import STGCN
+from dataUtils import loadEnergyData, energyDataset, getDatasets, normalizeAdjMat
+from processData import processData
+from models.STGCN_metadata import STGCN_metadata as STGNN
 from modelUtils import saveCheckpoint, loadCheckpoint, plotPredVsTrue, dotDict
 
 ########################################################################################
@@ -38,12 +39,12 @@ from modelUtils import saveCheckpoint, loadCheckpoint, plotPredVsTrue, dotDict
 torch.manual_seed(0)
 np.random.seed(0)
 
-# last three months - will add test set later
+# last three months
 validation_range = ["2014-10-01 00:00:00", "2014-12-31 23:00:00"]
 validation_range = [datetime.strptime(date, '%Y-%m-%d %H:%M:%S') for date in validation_range]
 
 ##### Load our args
-config_file = "testing_config"
+config_file = "STGCN_metadata_config"
 c = importlib.import_module("configs."+config_file)
 args = c.args
 
@@ -95,10 +96,10 @@ gc.collect()
 
 
 # Model init
-Gnet = STGCN(num_nodes,
+Gnet = STGNN(num_nodes,
              num_features,
              args.historical_input,
-             args.forecast_output).to(device=args.device)
+             args.forecast_output-1).to(device=args.device)
 
 # SGD and Loss
 optimizer = torch.optim.Adam(Gnet.parameters(), lr=args.lr)
@@ -135,14 +136,15 @@ for epoch in range(args.epochs):
     # Training the network
     ###########################################################
     Gnet.train()
-    for batch_idx, (features, target) in enumerate(train_loader):
+    for batch_idx, (features, metadata, target) in enumerate(train_loader):
         features = features.to(args.device)
+        metadata = metadata.to(args.device)
         target = target.to(args.device)
         
         optimizer.zero_grad()
         
         
-        predicted = Gnet(features, adj_norm)
+        predicted = Gnet(features, metadata, adj_norm)
         loss = criterion(predicted, target)
         #sys.exit()
         
@@ -170,11 +172,12 @@ for epoch in range(args.epochs):
     val_target = []
     with torch.no_grad():
         Gnet.eval()
-        for vbatch_idx, (vfeatures, vtarget) in enumerate(val_loader):
+        for vbatch_idx, (vfeatures, vmetadata, vtarget) in enumerate(val_loader):
             vfeatures = vfeatures.to(args.device)
+            vmetadata = vmetadata.to(args.device)
             vtarget = vtarget.to(args.device)
             
-            vpreds = Gnet(vfeatures, adj_norm)
+            vpreds = Gnet(vfeatures, vmetadata, adj_norm)
             vloss = criterion(vpreds, vtarget)
             
             # TODO: un-normalize the loss and convert to MAE for better interpretation
