@@ -67,7 +67,7 @@ if args.load_seq:
     _, adj_mat = loadEnergyData(processed_dir, incl_nodes = incl_nodes, partial = False)
     energy_demand = None
 else:
-    energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 225, partial = False)
+    energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = "All", partial = False)
     pass
 
 # format for pytorch

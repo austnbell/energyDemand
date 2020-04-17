@@ -28,6 +28,11 @@ def loadEnergyData(processed_dir, incl_nodes = "All", partial = False):
     else:
         energy_demand = pd.read_parquet(processed_dir + "EnergyDemandData.parquet")
         
+    # subset
+    cols2keep = ['time', 'node', 'dow', 'hour', 'holiday', 'season', 'solar_ecmwf', 'wind_ecmwf', 'load']
+    energy_demand = energy_demand[cols2keep]
+    energy_demand['node'] = energy_demand['node'].astype(int)
+        
     # load adjacency matrix
     adj_mat = np.load(processed_dir + "adjacency_matrix.npy")
     
@@ -214,7 +219,7 @@ class energyDataset(Dataset):
             node = d.node[0]
             print(node)
             
-            start_idx =  d.index[d['hour'].isin([0,12])].tolist()
+            start_idx =  d.index[d['hour'].isin([0])].tolist()
             
             inputs_tmp, target_tmp, meta_tmp = splitSequences(d, start_idx, 
                                                         subset_feats = args.subset_feats,

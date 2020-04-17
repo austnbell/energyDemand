@@ -17,8 +17,8 @@ args = dotDict({
         "historical_input": 24, # timestep inputs
         "forecast_output": 24, # timstep outputs
         "subset_feats": ['load', 'node', "solar_ecmwf"], # subset features to include? None is include all
-        "save_seq": True, # save our sequences instead of splitting
-        "load_seq": False, # load our sequences
+        "save_seq": False, # save our sequences instead of splitting
+        "load_seq": True, # load our sequences
         "seq_path": "./data/processed/nodeSequences", # path to saved sequences
         "processing_function": processData, # data processing function to use
         

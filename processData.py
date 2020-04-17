@@ -22,14 +22,10 @@ def processData(df, sol_wind_type = "ecmwf"):
     #scaler = MinMaxScaler()
     
     assert sol_wind_type in ['cosmo', 'ecmwf']
-    if sol_wind_type == 'cosmo':
-        df = df.drop(columns = ['solar_ecmwf', 'wind_ecmwf'])
-    else: 
-        df = df.drop(columns = ['solar_cosmo', 'wind_cosmo'])
-    
+
     # convert cat to numbers 
     df['season'] = label_encoder.fit_transform(df['season']) 
-    df['country'] = label_encoder.fit_transform(df['country'])
+    #df['country'] = label_encoder.fit_transform(df['country'])
     df['node'] = df['node'].astype(int)
     
     # normalize all data except the node ids and time
