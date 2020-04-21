@@ -114,7 +114,7 @@ class STG2Seq(nn.Module):
                                           spatial_feats = 16)
         
         # final temporal layor and output layer
-        self.final_temporal = LSTMBlock(hidden_dim, 64,n_layers=n_layers,bidirectional=bidirectional,dropout=dropout)
+        self.final_temporal = LSTMBlock(hidden_dim, 1,n_layers=n_layers,bidirectional=bidirectional,dropout=dropout)
         self.fc_out = nn.Linear(num_timesteps_in ,num_timesteps_predict) # no length loss for LSTM
         
     def forward(self, features, adj_norm):
@@ -123,6 +123,7 @@ class STG2Seq(nn.Module):
         #print(h2)
         h3 = self.final_temporal(h2)
         #print(h3[0,0,:,:],h3[0,1,:,:])
-        out = self.fc_out(h3.reshape((h3.shape[0], h3.shape[1], -1)))
+        #print(h3.size())
+        out = self.fc_out(h3.reshape((h3.shape[0], h3.shape[1], -1,h3.shape[2])))
         #print(out[0,0,:],out[0,1,:])
-        return out
+        return out.squeeze()
