@@ -30,7 +30,6 @@ from pytorch_classification.utils import Bar, AverageMeter
 # user functions
 from dataUtils import loadEnergyData, energyDataset, getDatasets, normalizeAdjMat
 from processData import processData
-from models.baseSTGCN import STGCN as STGNN
 from modelUtils import saveCheckpoint, loadCheckpoint, plotPredVsTrue, dotDict
 
 ########################################################################################
@@ -44,11 +43,15 @@ validation_range = ["2014-10-01 00:00:00", "2014-12-31 23:00:00"]
 validation_range = [datetime.strptime(date, '%Y-%m-%d %H:%M:%S') for date in validation_range]
 
 ##### Load our args
-config_file = "STGCN_metadata_config"
+config_file = "STGLSTM_config"
 c = importlib.import_module("configs."+config_file)
 args = c.args
 
 print(args)
+
+##### import correct model
+model_funcs = importlib.import_module("models."+args.model)
+STGNN = model_funcs.STGNN
 
 # data directories
 processed_dir = "./data/processed/"
@@ -100,7 +103,8 @@ gc.collect()
 Gnet = STGNN(num_nodes,
              num_features,
              args.historical_input,
-             args.forecast_output-1).to(device=args.device)
+             args.forecast_output-1,
+             args).to(device=args.device)
 
 # SGD and Loss
 optimizer = torch.optim.Adam(Gnet.parameters(), lr=args.lr)
@@ -146,6 +150,7 @@ for epoch in range(args.epochs):
         
         
         predicted = Gnet(features, metadata, adj_norm)
+        predicted.shape
         loss = criterion(predicted, target)
         
         loss.backward()
@@ -156,13 +161,7 @@ for epoch in range(args.epochs):
         avg_trn_loss.update(np_loss, args.batch_size)
         epoch_trn_loss.append(np_loss)
         
-        # plot progress 
-        if batch_idx % 8 == 0:
-            pass
-            #print(f"Batch index {batch_idx} Out of {len(train_loader)}")
-            #print(f"Average Training Loss: {avg_trn_loss.avg}")
-    
-     
+        
     
     ###########################################################
     # Network validation
@@ -180,8 +179,6 @@ for epoch in range(args.epochs):
             vpreds = Gnet(vfeatures, vmetadata, adj_norm)
             vloss = criterion(vpreds, vtarget)
             
-            # TODO: un-normalize the loss and convert to MAE for better interpretation
-            
             # storage and tracking
             np_vloss = vloss.detach().cpu().numpy()
             np_vpreds = vpreds.detach().cpu().numpy()
@@ -191,10 +188,6 @@ for epoch in range(args.epochs):
             val_predictions.append(np_vpreds)
             val_target.append(np_vtarget)
             
-            if batch_idx % 8 == 0:
-                pass
-                #print(f"Batch index {vbatch_idx} Out of {len(val_loader)}")
-                #print(f"Average Validation Loss: {avg_val_loss.avg}")
             
             
     scheduler.step()
@@ -205,7 +198,7 @@ for epoch in range(args.epochs):
     val_predictions = np.concatenate(val_predictions)
     val_target = np.concatenate(val_target)
     
-    # TODO: If validation imporves then save model 
+    # If validation imporves then save model 
     if val_loss[-1] < val_best:
         val_best = val_loss[-1]
         saveCheckpoint(Gnet, filename = args.model_name)
@@ -226,7 +219,8 @@ plt.legend()
 plt.show()
 #plt.ylim(0,.1)
  
-plotPredVsTrue(val_target, val_predictions, 10, 2)
+plotPredVsTrue(val_target, val_predictions, 2, 2)
+
 
 #val_predictions[0][0], val_predictions[0][1]
 

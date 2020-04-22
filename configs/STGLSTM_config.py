@@ -14,7 +14,7 @@ from dataUtils import loadEnergyData, processData, energyDataset, getDatasets, n
 
 args = dotDict({
         # model
-        "model": "STGCN_metadata",
+        "model": "STGLSTM",
         
         # data params
         "historical_input": 24, # timestep inputs
@@ -29,11 +29,14 @@ args = dotDict({
         "device": "cuda" if torch.cuda.is_available() else "cpu",
         "epochs": 200,
         "batch_size": 64,
-        "lr": .001,
+        "lr": .0005,
         "steps": 50, 
-        "model_name": "STGCN_metadata.pth",
+        "model_name": "STGLSTM.pth",
         
         # hyperparameters
-        "out_feats": 64,
-        "spatial_feats":16
+        "dropout": .1,
+        "hidden_dim": 128,
+        "bidirectional": True,
+        "spatial_feats":128
+        
 })

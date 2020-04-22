@@ -13,6 +13,9 @@ from dataUtils import loadEnergyData, processData, energyDataset, getDatasets, n
 
 
 args = dotDict({
+        # model
+        "model": "baseSTGCN",
+        
         # data params
         "historical_input": 24, # timestep inputs
         "forecast_output": 24, # timstep outputs
@@ -28,5 +31,9 @@ args = dotDict({
         "batch_size": 64,
         "lr": .001,
         "steps": 50, 
-        "model_name": "baselineSTGCN.pth"
+        "model_name": "baselineSTGCN.pth",
+        
+        # hyperparameters
+        "out_feats": 64,
+        "spatial_feats":16
 })

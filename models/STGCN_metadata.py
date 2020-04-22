@@ -50,7 +50,7 @@ class spatioTemporalBlock(nn.Module):
     Spatial Temporal Block to populate our STGCN
     """
     def __init__(self, num_nodes, in_feats, out_feats, spatial_feats, 
-                 kernel_size = 3, bias = True):
+                 kernel_size = 3):
         super(spatioTemporalBlock, self).__init__()
         
         """
@@ -99,23 +99,23 @@ class spatioTemporalBlock(nn.Module):
 
 
 
-class STGCN_metadata(nn.Module):
+class STGNN(nn.Module):
     """
     bringing everything together
     """
     def __init__(self, num_nodes, in_feats, num_timesteps_in, 
-                 num_timesteps_predict, kernel_size = 3):
-        super(STGCN_metadata, self).__init__()
+                 num_timesteps_predict,  args, kernel_size = 3):
+        super(STGNN, self).__init__()
         
         self.block1 = spatioTemporalBlock(num_nodes, in_feats,
-                                          out_feats = 64, 
-                                          spatial_feats = 16,
+                                          out_feats = args.out_feats, 
+                                          spatial_feats = args.spatial_feats,
                                           kernel_size = kernel_size)
         
         self.block2 = spatioTemporalBlock(num_nodes, 
-                                          in_feats = 64 ,
-                                          out_feats = 64, 
-                                          spatial_feats = 16,
+                                          in_feats = args.out_feats ,
+                                          out_feats = args.out_feats, 
+                                          spatial_feats = args.spatial_feats,
                                           kernel_size= kernel_size)
         
         # final temporal layor and output layer

@@ -42,6 +42,7 @@ class temporalConv(nn.Module):
         if activation:
             h = torch.tanh(h + self.conv3(X))
             
+        print(h.permute(0,2,3,1).shape)
         return h.permute(0,2,3,1)
 
 
@@ -50,7 +51,7 @@ class spatioTemporalBlock(nn.Module):
     Spatial Temporal Block to populate our STGCN
     """
     def __init__(self, num_nodes, in_feats, out_feats, spatial_feats, 
-                 kernel_size = 3, bias = True):
+                 kernel_size = 3):
         super(spatioTemporalBlock, self).__init__()
         
         """
@@ -99,23 +100,24 @@ class spatioTemporalBlock(nn.Module):
 
 
 
-class STGCN(nn.Module):
+class STGNN(nn.Module):
     """
     bringing everything together
     """
     def __init__(self, num_nodes, in_feats, num_timesteps_in, 
-                 num_timesteps_predict, kernel_size = 3):
-        super(STGCN, self).__init__()
+                 num_timesteps_predict, args, kernel_size = 3):
+        super(STGNN, self).__init__()
         
-        self.block1 = spatioTemporalBlock(num_nodes, in_feats,
-                                          out_feats = 64, 
-                                          spatial_feats = 16,
+        self.block1 = spatioTemporalBlock(num_nodes, 
+                                          in_feats,
+                                          out_feats = args.out_feats, 
+                                          spatial_feats = args.spatial_feats,
                                           kernel_size = kernel_size)
         
         self.block2 = spatioTemporalBlock(num_nodes, 
-                                          in_feats = 64 ,
-                                          out_feats = 64, 
-                                          spatial_feats = 16,
+                                          in_feats = args.out_feats ,
+                                          out_feats = args.out_feats, 
+                                          spatial_feats = args.spatial_feats,
                                           kernel_size= kernel_size)
         
         # final temporal layor and output layer
@@ -123,12 +125,8 @@ class STGCN(nn.Module):
         self.fc_out = nn.Linear((num_timesteps_in - ((kernel_size - 1) * 5))*64 ,num_timesteps_predict) # accounts for the length lost every temporal conv
         
     def forward(self, features,metadata, adj_norm):
-        print(features.shape)
         h1 = self.block1(features, adj_norm)
         h2 = self.block2(h1, adj_norm)
-        #print(h2)
         h3 = self.final_temporal(h2, activation = False)
-        print(h3.reshape((h3.shape[0], h3.shape[1], -1)).shape)
         out = self.fc_out(h3.reshape((h3.shape[0], h3.shape[1], -1)))
-        #print(out[0,0,:],out[0,1,:])
         return out
