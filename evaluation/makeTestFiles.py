@@ -18,8 +18,9 @@ import torch.nn as nn
 
 # user functions
 import sys
-sys.path.append("..")
-from dataUtils import loadEnergyData, processData, energyDataset, getDatasets, normalizeAdjMat
+sys.path.append("C:/Users/Austin Bell/Documents/Columbia/Deep Learning/Project")
+from dataUtils import loadEnergyData, energyDataset, getDatasets, normalizeAdjMat
+from processData import processData
 from modelUtils import dotDict
 
 ##### Load our args
@@ -43,13 +44,13 @@ validation_range = [datetime.strptime(date, '%Y-%m-%d %H:%M:%S') for date in val
 # we must have these arguments regardless of actual config
 args.save_seq = True
 args.load_seq = False
-args.seq_path = os.path.join("." + args.seq_path, "testingOnly")
+args.seq_path = os.path.join(args.seq_path, "testingOnly")
 
 # data directories
-processed_dir = "../data/processed/"
+processed_dir = "./data/processed/"
 
 # Generate files
-energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 1050, partial = False)
+energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = "All", partial = False)
 _, val_dataset = getDatasets(args, energy_demand, validation_range, validation_only = True)
 
 

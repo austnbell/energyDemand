@@ -18,7 +18,7 @@ def plotPredVsTrue(target, preds, time_slot_idx, node):
     plt.plot(y_preds, label = "Prediction Load")
     plt.plot(y_true, label = "Gold Standard Load")
     plt.xlabel("Timestep (hourly)")
-    plt.ylabel("Normalized Load Demand")
+    plt.ylabel("Load Demand")
     plt.legend()
     plt.show()
 

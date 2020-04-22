@@ -30,7 +30,7 @@ from pytorch_classification.utils import Bar, AverageMeter
 # user functions
 from dataUtils import loadEnergyData, energyDataset, getDatasets, normalizeAdjMat
 from processData import processData
-from models.STGCN_metadata import STGCN_metadata as STGNN
+from models.baseSTGCN import STGCN as STGNN
 from modelUtils import saveCheckpoint, loadCheckpoint, plotPredVsTrue, dotDict
 
 ########################################################################################
@@ -53,6 +53,7 @@ print(args)
 # data directories
 processed_dir = "./data/processed/"
 
+
 ########################################################################################
 # Data Prep
 ########################################################################################
@@ -67,7 +68,7 @@ if args.load_seq:
     _, adj_mat = loadEnergyData(processed_dir, incl_nodes = incl_nodes, partial = False)
     energy_demand = None
 else:
-    energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = "All", partial = False)
+    energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 4, partial = True)
     pass
 
 # format for pytorch
@@ -146,7 +147,6 @@ for epoch in range(args.epochs):
         
         predicted = Gnet(features, metadata, adj_norm)
         loss = criterion(predicted, target)
-        #sys.exit()
         
         loss.backward()
         optimizer.step()

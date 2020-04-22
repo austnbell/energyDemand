@@ -41,7 +41,7 @@ class temporalConv(nn.Module):
         #h = F.relu(h1 + self.conv3(X))
         if activation:
             h = torch.tanh(h + self.conv3(X))
-        
+            
         return h.permute(0,2,3,1)
 
 
@@ -123,11 +123,12 @@ class STGCN(nn.Module):
         self.fc_out = nn.Linear((num_timesteps_in - ((kernel_size - 1) * 5))*64 ,num_timesteps_predict) # accounts for the length lost every temporal conv
         
     def forward(self, features,metadata, adj_norm):
+        print(features.shape)
         h1 = self.block1(features, adj_norm)
         h2 = self.block2(h1, adj_norm)
         #print(h2)
         h3 = self.final_temporal(h2, activation = False)
-        #print(h3[0,0,:,:],h3[0,1,:,:])
+        print(h3.reshape((h3.shape[0], h3.shape[1], -1)).shape)
         out = self.fc_out(h3.reshape((h3.shape[0], h3.shape[1], -1)))
         #print(out[0,0,:],out[0,1,:])
         return out
