@@ -19,11 +19,6 @@ class LSTMBlock(nn.Module):
                             #dropout = dropout,
                             batch_first=True)
         
-        # attention layer
-        self.attn_weights = nn.Parameter(torch.Tensor(1, hidden_dim),
-                                     requires_grad=True)
-
-        nn.init.xavier_uniform_(self.attn_weights.data)
 
         
     def forward(self, X, activation = True):
@@ -33,18 +28,16 @@ class LSTMBlock(nn.Module):
 
         X = X.split(1,dim=1)
         lstm_concat = []
-        Hs = []
         for node_feats in X:
-            lstm_out, hs = self.lstm(node_feats.squeeze(1))
+            lstm_out, _ = self.lstm(node_feats.squeeze(1))
             if self.bidirectional:
                 lstm_out = (lstm_out[:, :, :self.hidden_dim] + lstm_out[:, :, self.hidden_dim:])/2 # averarge the two directions
             
             lstm_concat.append(lstm_out)
-            Hs.append(hs)
             
-        output = torch.stack(lstm_concat)
+        lstm_concat = torch.stack(lstm_concat)
 
-        return output.permute(1,0,2,3)
+        return lstm_concat.permute(1,0,2,3)
 
 class spatioTemporalBlock(nn.Module):
     """
@@ -123,10 +116,10 @@ class STGNN(nn.Module):
         
     def forward(self, features, metadata, adj_norm):
         features = self.dropout(features)
-        h1 = self.block1(features, adj_norm)
-        h2 = self.block2(h1, adj_norm)
-        h3 = self.final_temporal(h2)
+        h = self.block1(features, adj_norm)
+        h = self.block2(h, adj_norm)
+        h = self.final_temporal(h)
         #print(h3.shape)
         #print(h3.reshape((h3.shape[0], h3.shape[1], h3.shape[2] * h3.shape[3])).shape)
-        out = self.fc_out(h3.reshape((h3.shape[0], h3.shape[1], h3.shape[2] * h3.shape[3])))
+        out = self.fc_out(h3.reshape((h.shape[0], h.shape[1], h.shape[2] * h.shape[3])))
         return out.squeeze()
