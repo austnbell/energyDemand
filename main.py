@@ -43,7 +43,7 @@ validation_range = ["2014-10-01 00:00:00", "2014-12-31 23:00:00"]
 validation_range = [datetime.strptime(date, '%Y-%m-%d %H:%M:%S') for date in validation_range]
 
 ##### Load our args
-config_file = "STGLSTM_config"
+config_file = "STGLSTM_metadata_config"
 c = importlib.import_module("configs."+config_file)
 args = c.args
 
@@ -68,7 +68,7 @@ if args.load_seq:
     incl_nodes = max([int(re.search("\d{1,5}", f).group(0)) for f in files if re.search("\d", f)])
     
     print("loading data")
-    _, adj_mat = loadEnergyData(processed_dir, incl_nodes = incl_nodes, partial = False)
+    _, adj_mat = loadEnergyData(processed_dir, incl_nodes = incl_nodes, partial = True)
     energy_demand = None
 else:
     energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 4, partial = True)
