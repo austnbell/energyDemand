@@ -28,7 +28,7 @@ args = dotDict({
         # model params
         "device": "cuda" if torch.cuda.is_available() else "cpu",
         "epochs": 200,
-        "batch_size": 64,
+        "batch_size": 16,
         "lr": .0005,
         "steps": 50, 
         "model_name": "STGLSTM.pth",
