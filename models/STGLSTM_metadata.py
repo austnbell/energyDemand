@@ -128,7 +128,7 @@ class STGNN(nn.Module):
         features = self.dropout(features)
         h = self.block1(features, adj_norm)
         #h = self.block2(h, adj_norm)
-        h = self.final_temporal(h)
+        #h = self.final_temporal(h)
         
         stglstm_out = torch.sigmoid(
                 self.fc_stglstm(h.reshape((h.shape[0], h.shape[1], h.shape[2] * h.shape[3])))
