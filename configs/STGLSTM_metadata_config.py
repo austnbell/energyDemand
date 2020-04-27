@@ -28,15 +28,15 @@ args = dotDict({
         # model params
         "device": "cuda" if torch.cuda.is_available() else "cpu",
         "epochs": 200,
-        "batch_size": 64,
+        "batch_size": 24,
         "lr": .0005,
         "steps": 50, 
         "model_name": "STGLSTM_metadata.pth",
         
         # hyperparameters
         "dropout": .1,
-        "hidden_dim": 128,
+        "hidden_dim": 100,
         "bidirectional": True,
-        "spatial_feats":128
+        "spatial_feats":64
         
 })
