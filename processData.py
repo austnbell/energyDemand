@@ -13,7 +13,7 @@ from sklearn.preprocessing import MinMaxScaler
 import torch
 import pickle
 
-with open("./data/processed/node_stats.pkl", "rb") as f:
+with open("../data/processed/node_stats.pkl", "rb") as f:
     node_stats = pickle.load(f)
 
 # very basic preprocessing
