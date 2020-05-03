@@ -56,7 +56,6 @@ STGNN = model_funcs.STGNN
 # data directories
 processed_dir = "./data/processed/"
 
-
 ########################################################################################
 # Data Prep
 ########################################################################################
@@ -68,8 +67,8 @@ if args.load_seq:
     incl_nodes = max([int(re.search("\d{1,5}", f).group(0)) for f in files if re.search("\d", f)])
     
     print("loading data")
-    _, adj_mat = loadEnergyData(processed_dir, incl_nodes = incl_nodes, partial = False)
-    energy_demand = None
+    _, adj_mat = loadEnergyData(processed_dir, incl_nodes = incl_nodes, partial = True)
+    #energy_demand = None
 else:
     energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 4, partial = True)
     pass
