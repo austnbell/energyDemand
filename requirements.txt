@@ -1,0 +1,8 @@
+dgl_cu90==0.4.2
+matplotlib==3.0.2
+pandas==0.25.3
+~umpy==1.15.4
+torch==1.0.1
+dgl==0.4.3.post2
+numpy==1.18.4
+scikit_learn==0.22.2.post1

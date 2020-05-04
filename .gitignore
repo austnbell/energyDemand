@@ -5,3 +5,6 @@
 !/savedModels/placeholder.txt
 !/data/placeholder.txt
 /papers/*
+!/report/*
+!/report/An Exploration of STGNN for Electricity Load Forecasting.pdf
+!/report/img/*

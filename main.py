@@ -15,7 +15,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
-import time
 import math, re
 import gc
 import importlib
@@ -24,7 +23,6 @@ import importlib
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from pytorch_classification.utils import Bar, AverageMeter
 
 
 # user functions
@@ -130,8 +128,6 @@ for epoch in range(args.epochs):
     epoch_trn_loss = []
     epoch_val_loss = []
     
-    #bar = Bar('Training Graph Net', max=int(len(train_dataset.inputs)/args.batch_size))
-    end = time.time()
     
     adj_norm = adj_norm.to(args.device) 
     
@@ -218,21 +214,5 @@ plt.legend()
 plt.show()
 #plt.ylim(0,.1)
  
-plotPredVsTrue(val_target, val_predictions, 2, 2)
+#plotPredVsTrue(val_target, val_predictions, 2, 2)
 
-
-#val_predictions[0][0], val_predictions[0][1]
-
-#Gnet = loadCheckpoint(Gnet, filename = "initial model.pth")
-
-# maybe will want to include later
-# =============================================================================
-#         bar.suffix  = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss_train: {l_trn:.4f} | Loss_v: {:.3f}'.format(
-#                     batch=batch_idx,
-#                     size=int(len(train_loader)),
-#                     total=bar.elapsed_td,
-#                     eta=bar.eta_td,
-#                     l_trn=avg_trn_loss.avg,
-#                     l_val=0.000)
-#         bar.next()
-# =============================================================================
