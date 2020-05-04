@@ -20,7 +20,7 @@ Where `[STGNN-config]` is the name of the config / arguments file in the ./confi
 * [RE-Europe](https://www.nature.com/articles/sdata2017175)
 * Includes 1,496 node buses across mainland europe with 2,156 transmission lines.
 
-<img src="./report/img/RE_Europe_map.JPG" width="100">
+<img src="./report/img/RE_Europe_map.JPG" width="500">
 
 ## Description:
 GNNs and Benchmarks for Node-level Energy Load Forecasting.  
