@@ -42,7 +42,6 @@ class temporalConv(nn.Module):
         if activation:
             h = torch.tanh(h + self.conv3(X))
             
-        print(h.permute(0,2,3,1).shape)
         return h.permute(0,2,3,1)
 
 
@@ -87,15 +86,12 @@ class spatioTemporalBlock(nn.Module):
            
     def forward(self, X, adj_norm):
         temp1 = self.t1(X)
-        #print("temporal1 convolution:", temp1[0,0,:,:], temp1[0,1,:,:])
         
         #spatial1 = self.gconv(temp1, adj_norm)
         support = torch.einsum("ij,jklm->kilm", [adj_norm, temp1.permute(1, 0, 2, 3)])
         spatial1 = torch.matmul(support, self.theta) 
-        #print("Spatial Block",  spatial1[0,0,:,:], spatial1[0,1,:,:])
         
         out = self.t2(F.relu(spatial1), activation = False)
-        #print("2nd Temporal Convolution", out[0,0,:,:], out[0,1,:,:])
         return self.batch_norm(out)
 
 

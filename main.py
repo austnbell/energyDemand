@@ -8,14 +8,12 @@ currently does not work when we exceed 20 nodes
 """
 
 
-import os, sys
-import argparse
-import pickle 
+import os, sys 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
-import math, re
+import  re
 import gc
 import importlib
 
@@ -41,7 +39,7 @@ validation_range = ["2014-10-01 00:00:00", "2014-12-31 23:00:00"]
 validation_range = [datetime.strptime(date, '%Y-%m-%d %H:%M:%S') for date in validation_range]
 
 ##### Load our args
-config_file = "STGLSTM_metadata_config"
+config_file = sys.argv[1]#"STGLSTM_metadata_config"
 c = importlib.import_module("configs."+config_file)
 args = c.args
 
@@ -66,10 +64,10 @@ if args.load_seq:
     
     print("loading data")
     _, adj_mat = loadEnergyData(processed_dir, incl_nodes = incl_nodes, partial = True)
-    #energy_demand = None
+    energy_demand = None
 else:
-    energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = 4, partial = True)
-    pass
+    energy_demand, adj_mat = loadEnergyData(processed_dir, incl_nodes = "All", partial = False)
+
 
 # format for pytorch
 train_dataset, val_dataset = getDatasets(args, energy_demand, validation_range)
@@ -121,10 +119,7 @@ for epoch in range(args.epochs):
     print("Epoch Number: " + str(epoch + 1))
     
     
-    # tracking 
-    avg_trn_loss = AverageMeter()
-    avg_val_loss = AverageMeter()
-    
+    # tracking     
     epoch_trn_loss = []
     epoch_val_loss = []
     
@@ -153,7 +148,6 @@ for epoch in range(args.epochs):
         
         # update tracking
         np_loss = loss.detach().cpu().numpy()
-        avg_trn_loss.update(np_loss, args.batch_size)
         epoch_trn_loss.append(np_loss)
         
         
@@ -178,7 +172,6 @@ for epoch in range(args.epochs):
             np_vloss = vloss.detach().cpu().numpy()
             np_vpreds = vpreds.detach().cpu().numpy()
             np_vtarget = vtarget.detach().cpu().numpy()
-            avg_val_loss.update(np_vloss, args.batch_size)
             epoch_val_loss.append(np_vloss)
             val_predictions.append(np_vpreds)
             val_target.append(np_vtarget)
