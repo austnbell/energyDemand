@@ -22,6 +22,8 @@ Where `[STGNN-config]` is the name of the config / arguments file in the ./confi
 
 <img src="./report/img/RE_Europe_map.JPG" width="500">
 
+Transmission network overlaid on map of mainland Europe.
+
 ## Description:
 GNNs and Benchmarks for Node-level Energy Load Forecasting.  
  * Implementation of STGNN variants using [pytorch](https://pytorch.org/)
